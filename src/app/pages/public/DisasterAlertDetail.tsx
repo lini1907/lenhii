@@ -1,41 +1,47 @@
 import { Link, useParams } from "react-router"
 import { AlertTriangle, MapPin, Clock, Users, ArrowLeft, Navigation, Phone, Share2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import { getAlerts, type Alert as DbAlert } from "../../../services/alertsService"
 
 export function DisasterAlertDetail() {
   const { id } = useParams()
+  const [alert, setAlert] = useState<DbAlert | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock data - in real app, fetch based on id
-  const alert = {
-    id: id || "1",
-    type: "Wildfire",
-    severity: "Critical",
-    title: "Major Wildfire Spreading in Northern Hills",
-    location: "Northern Hills District",
-    coordinates: { lat: 34.0522, lng: -118.2437 },
-    affectedAreas: ["Zone A", "Zone B", "Zone C"],
-    time: "2 hours ago",
-    issuedAt: "March 14, 2026 10:30 AM",
-    status: "Active",
-    description:
-      "A fast-moving wildfire has been reported in the Northern Hills District. Strong winds are contributing to rapid spread. Multiple structures are threatened. Immediate evacuation is recommended for all residents in affected zones.",
-    updates: [
-      { time: "2 hours ago", message: "Fire crews deployed to establish containment lines" },
-      { time: "1 hour ago", message: "Evacuation orders issued for Zone A and Zone B" },
-      { time: "30 minutes ago", message: "Additional units requested from neighboring districts" },
-    ],
-    safetyInstructions: [
-      "Evacuate immediately if you are in Zone A, B, or C",
-      "Follow designated evacuation routes only",
-      "Take essential items and important documents",
-      "Close all windows and doors before leaving",
-      "Do not return until authorities declare it safe",
-    ],
-    evacuationCenters: [
-      { name: "Central Community Center", address: "123 Main St", capacity: "500 people" },
-      { name: "Sports Complex", address: "456 Oak Ave", capacity: "800 people" },
-    ],
-    estimatedAffected: "15,000",
-  }
+  useEffect(() => {
+    if (!id) {
+      setError("Invalid alert id")
+      setLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    getAlerts()
+      .then((alerts) => {
+        if (cancelled) return
+        const found = alerts.find((a) => a.id === id) ?? null
+        if (!found) {
+          setError("Alert not found")
+        }
+        setAlert(found)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message ?? "Failed to load alert")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [id])
+
+  const issuedAt = alert ? new Date(alert.created_at).toLocaleString() : ""
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -49,18 +55,32 @@ export function DisasterAlertDetail() {
           <span>Back to Alerts</span>
         </Link>
 
+        {loading && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 text-gray-600">
+            Loading alert…
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="bg-white rounded-xl border border-red-200 p-6 mb-6 text-red-700">
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && alert && (
+          <>
         {/* Alert Header */}
         <div className="bg-white rounded-xl border-2 border-red-300 shadow-lg overflow-hidden mb-6">
           <div
             className={`px-6 py-4 ${
-              alert.severity === "Critical" ? "bg-red-600" : "bg-orange-600"
+              alert.severity?.toLowerCase() === "critical" ? "bg-red-600" : "bg-orange-600"
             } text-white`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <AlertTriangle className="w-8 h-8" />
                 <div>
-                  <p className="text-sm font-medium opacity-90">{alert.type} Alert</p>
+                  <p className="text-sm font-medium opacity-90">{alert.disaster_type} Alert</p>
                   <h1 className="text-2xl font-bold">{alert.title}</h1>
                 </div>
               </div>
@@ -88,7 +108,7 @@ export function DisasterAlertDetail() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Issued</p>
-                  <p className="font-medium text-gray-900">{alert.issuedAt}</p>
+                  <p className="font-medium text-gray-900">{issuedAt}</p>
                 </div>
               </div>
 
@@ -98,7 +118,7 @@ export function DisasterAlertDetail() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Est. Affected</p>
-                  <p className="font-medium text-gray-900">{alert.estimatedAffected} people</p>
+                  <p className="font-medium text-gray-900">—</p>
                 </div>
               </div>
             </div>
@@ -125,73 +145,15 @@ export function DisasterAlertDetail() {
           </button>
         </div>
 
-        {/* Safety Instructions */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Safety Instructions</h2>
-          <ul className="space-y-3">
-            {alert.safetyInstructions.map((instruction, index) => (
-              <li key={index} className="flex items-start space-x-3">
-                <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-red-600 font-bold text-sm">{index + 1}</span>
-                </div>
-                <span className="text-gray-700">{instruction}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Affected Areas */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Affected Areas</h2>
-          <div className="flex flex-wrap gap-3">
-            {alert.affectedAreas.map((area, index) => (
-              <span
-                key={index}
-                className="px-4 py-2 bg-red-50 text-red-700 rounded-lg font-medium border border-red-200"
-              >
-                {area}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Evacuation Centers */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Evacuation Centers</h2>
-          <div className="space-y-4">
-            {alert.evacuationCenters.map((center, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200"
-              >
-                <div>
-                  <h3 className="font-bold text-gray-900">{center.name}</h3>
-                  <p className="text-sm text-gray-600">{center.address}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">Capacity</p>
-                  <p className="font-bold text-gray-900">{center.capacity}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Live Updates */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Live Updates</h2>
-          <div className="space-y-4">
-            {alert.updates.map((update, index) => (
-              <div key={index} className="flex items-start space-x-4">
-                <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500">{update.time}</p>
-                  <p className="text-gray-900">{update.message}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">More details</h2>
+          <p className="text-gray-600">
+            For this student demo, the detail page currently shows the core fields from the database.
+            You can extend the `alerts` table later with fields like instructions, affected areas, and updates.
+          </p>
         </div>
+          </>
+        )}
       </div>
     </div>
   )

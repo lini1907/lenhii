@@ -1,74 +1,56 @@
 import { Link } from "react-router"
 import { Bell, MapPin, Clock, AlertTriangle, Filter, Search } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { getAlerts, type Alert as DbAlert } from "../../../services/alertsService"
 
 export function DisasterAlerts() {
   const [filterSeverity, setFilterSeverity] = useState("all")
   const [filterType, setFilterType] = useState("all")
+  const [alerts, setAlerts] = useState<DbAlert[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const alerts = [
-    {
-      id: 1,
-      type: "Wildfire",
-      severity: "Critical",
-      title: "Major Wildfire Spreading in Northern Hills",
-      location: "Northern Hills District",
-      affectedAreas: ["Zone A", "Zone B", "Zone C"],
-      time: "2 hours ago",
-      status: "Active",
-      description: "Fast-moving wildfire threatening residential areas. Immediate evacuation recommended.",
-    },
-    {
-      id: 2,
-      type: "Flood",
-      severity: "High",
-      title: "Flash Flood Warning - Downtown Area",
-      location: "Downtown District",
-      affectedAreas: ["Central Plaza", "River District"],
-      time: "4 hours ago",
-      status: "Active",
-      description: "Heavy rainfall causing rapid water level rise. Avoid low-lying areas.",
-    },
-    {
-      id: 3,
-      type: "Storm",
-      severity: "Medium",
-      title: "Severe Thunderstorm Approaching",
-      location: "Coastal Region",
-      affectedAreas: ["Beach Area", "Port District"],
-      time: "6 hours ago",
-      status: "Active",
-      description: "Strong winds and heavy rain expected. Secure loose objects and stay indoors.",
-    },
-    {
-      id: 4,
-      type: "Earthquake",
-      severity: "High",
-      title: "Aftershock Alert - Eastern Region",
-      location: "Eastern District",
-      affectedAreas: ["East Valley", "Hill Side"],
-      time: "8 hours ago",
-      status: "Monitoring",
-      description: "Following magnitude 6.2 earthquake. Multiple aftershocks expected in next 24 hours.",
-    },
-    {
-      id: 5,
-      type: "Landslide",
-      severity: "Medium",
-      title: "Landslide Risk in Mountain Areas",
-      location: "Mountain Ridge",
-      affectedAreas: ["Summit Road", "Valley View"],
-      time: "10 hours ago",
-      status: "Warning",
-      description: "Unstable ground conditions due to recent rainfall. Avoid mountain roads.",
-    },
-  ]
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
 
-  const filteredAlerts = alerts.filter((alert) => {
-    if (filterSeverity !== "all" && alert.severity !== filterSeverity) return false
-    if (filterType !== "all" && alert.type !== filterType) return false
-    return true
-  })
+    getAlerts()
+      .then((data) => {
+        if (!cancelled) setAlerts(data)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message ?? "Failed to load alerts")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter((alert) => {
+      const severity = alert.severity?.toLowerCase()
+      const type = alert.disaster_type?.toLowerCase()
+
+      if (filterSeverity !== "all" && severity !== filterSeverity.toLowerCase()) return false
+      if (filterType !== "all" && type !== filterType.toLowerCase()) return false
+      return true
+    })
+  }, [alerts, filterSeverity, filterType])
+
+  const formatTimeAgo = (iso: string) => {
+    const created = new Date(iso).getTime()
+    const diffMs = Date.now() - created
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    if (diffHours < 1) return "just now"
+    if (diffHours < 24) return `${diffHours} hours ago`
+    const diffDays = Math.floor(diffHours / 24)
+    return `${diffDays} days ago`
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -114,10 +96,10 @@ export function DisasterAlerts() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               >
                 <option value="all">All Severity Levels</option>
-                <option value="Critical">Critical</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
               </select>
             </div>
 
@@ -129,11 +111,10 @@ export function DisasterAlerts() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
               >
                 <option value="all">All Types</option>
-                <option value="Wildfire">Wildfire</option>
-                <option value="Flood">Flood</option>
-                <option value="Storm">Storm</option>
-                <option value="Earthquake">Earthquake</option>
-                <option value="Landslide">Landslide</option>
+                <option value="flood">Flood</option>
+                <option value="storm">Storm</option>
+                <option value="landslide">Landslide</option>
+                <option value="heat">Heat</option>
               </select>
             </div>
           </div>
@@ -142,12 +123,27 @@ export function DisasterAlerts() {
         {/* Alert Count */}
         <div className="mb-6">
           <p className="text-gray-600">
-            Showing <span className="font-bold text-gray-900">{filteredAlerts.length}</span> active alerts
+            Showing <span className="font-bold text-gray-900">{filteredAlerts.length}</span> alerts
           </p>
         </div>
 
         {/* Alerts List */}
         <div className="space-y-6">
+          {loading && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6 text-gray-600">
+              Loading alerts…
+            </div>
+          )}
+          {!loading && error && (
+            <div className="bg-white rounded-xl border border-red-200 p-6 text-red-700">
+              {error}
+            </div>
+          )}
+          {!loading && !error && filteredAlerts.length === 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6 text-gray-600">
+              No alerts found.
+            </div>
+          )}
           {filteredAlerts.map((alert) => (
             <Link
               key={alert.id}
@@ -159,18 +155,18 @@ export function DisasterAlerts() {
                   <div className="flex items-start space-x-4 flex-1">
                     <div
                       className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        alert.severity === "Critical"
+                        alert.severity?.toLowerCase() === "critical"
                           ? "bg-red-100"
-                          : alert.severity === "High"
+                          : alert.severity?.toLowerCase() === "high"
                           ? "bg-orange-100"
                           : "bg-yellow-100"
                       }`}
                     >
                       <AlertTriangle
                         className={`w-6 h-6 ${
-                          alert.severity === "Critical"
+                          alert.severity?.toLowerCase() === "critical"
                             ? "text-red-600"
-                            : alert.severity === "High"
+                            : alert.severity?.toLowerCase() === "high"
                             ? "text-orange-600"
                             : "text-yellow-600"
                         }`}
@@ -181,9 +177,9 @@ export function DisasterAlerts() {
                       <div className="flex items-center space-x-3 mb-2">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-bold ${
-                            alert.severity === "Critical"
+                            alert.severity?.toLowerCase() === "critical"
                               ? "bg-red-100 text-red-700"
-                              : alert.severity === "High"
+                              : alert.severity?.toLowerCase() === "high"
                               ? "bg-orange-100 text-orange-700"
                               : "bg-yellow-100 text-yellow-700"
                           }`}
@@ -191,10 +187,7 @@ export function DisasterAlerts() {
                           {alert.severity}
                         </span>
                         <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
-                          {alert.type}
-                        </span>
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                          {alert.status}
+                          {alert.disaster_type}
                         </span>
                       </div>
 
@@ -208,21 +201,7 @@ export function DisasterAlerts() {
                         </div>
                         <div className="flex items-center space-x-2">
                           <Clock className="w-4 h-4" />
-                          <span>{alert.time}</span>
-                        </div>
-                      </div>
-
-                      <div className="mt-4">
-                        <p className="text-sm text-gray-500 mb-2">Affected Areas:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {alert.affectedAreas.map((area, index) => (
-                            <span
-                              key={index}
-                              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium"
-                            >
-                              {area}
-                            </span>
-                          ))}
+                          <span>{formatTimeAgo(alert.created_at)}</span>
                         </div>
                       </div>
                     </div>
@@ -232,9 +211,9 @@ export function DisasterAlerts() {
 
               <div
                 className={`px-6 py-3 ${
-                  alert.severity === "Critical"
+                  alert.severity?.toLowerCase() === "critical"
                     ? "bg-red-50"
-                    : alert.severity === "High"
+                    : alert.severity?.toLowerCase() === "high"
                     ? "bg-orange-50"
                     : "bg-yellow-50"
                 }`}

@@ -1,8 +1,11 @@
 import { Link, useNavigate } from "react-router"
 import { AlertTriangle, Bell, Map, Shield, Phone, FileText, ArrowRight, Activity } from "lucide-react"
+import { useEffect, useState } from "react"
+import { getAlerts, type Alert as DbAlert } from "../../../services/alertsService"
 
 export function PublicHome() {
   const navigate = useNavigate()
+  const [dbAlerts, setDbAlerts] = useState<DbAlert[]>([])
 
   const handleSOSClick = () => {
     const isCitizenLoggedIn = localStorage.getItem("citizenAuthenticated") === "true"
@@ -13,17 +16,25 @@ export function PublicHome() {
     }
   }
 
-  const activeAlerts = [
-    { id: 1, type: "Flood", severity: "High", location: "Downtown District", time: "2 hours ago" },
-    { id: 2, type: "Wildfire", severity: "Critical", location: "Northern Hills", time: "4 hours ago" },
-    { id: 3, type: "Storm", severity: "Medium", location: "Coastal Area", time: "6 hours ago" },
-  ]
+  useEffect(() => {
+    getAlerts()
+      .then((data) => setDbAlerts(data.slice(0, 3)))
+      .catch(() => setDbAlerts([]))
+  }, [])
+
+  const activeAlerts = dbAlerts.map((a) => ({
+    id: a.id,
+    type: a.disaster_type,
+    severity: a.severity,
+    location: a.location,
+    time: new Date(a.created_at).toLocaleDateString(),
+  }))
 
   const stats = [
     { label: "Active Incidents", value: "47", icon: Activity, color: "text-red-600" },
     { label: "Rescue Teams", value: "23", icon: Shield, color: "text-blue-600" },
     { label: "People Rescued", value: "189", icon: Bell, color: "text-green-600" },
-    { label: "Active Alerts", value: "8", icon: AlertTriangle, color: "text-orange-600" },
+    { label: "Active Alerts", value: String(dbAlerts.length || 0), icon: AlertTriangle, color: "text-orange-600" },
   ]
 
   return (
