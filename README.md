@@ -62,9 +62,9 @@ The system allows citizens to receive alerts and report emergencies, while coord
 
 ### Tools
 
-* Figma AI (UI Design)
-* GitHub (Version Control)
-* Vercel (Deployment)
+* Figma
+* GitHub
+* Vercel
 
 ---
 
@@ -94,18 +94,6 @@ The system simulates realistic disaster situations in Vietnam.
 
 ---
 
-## 📷 System Interface
-
-*(Screenshots of the system UI can be added here)*
-
-Example:
-
-* Citizen dashboard
-* SOS reporting screen
-* Coordinator monitoring dashboard
-* Rescue mission management
-
----
 
 ## 🚀 Deployment
 
